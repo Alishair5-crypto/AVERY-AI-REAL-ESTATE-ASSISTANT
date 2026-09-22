@@ -159,6 +159,11 @@ export async function processCustomerMessage(
 
   await tools.addMessage(conversationId, "customer", text);
 
+  // A customer reply means any scheduled re-engagement is no longer due.
+  // Stop pending follow-ups immediately so the demo mirrors the intended
+  // lead lifecycle.
+  await tools.stopFollowupsForLead(leadId, "customer_replied");
+
   const replies: EngineTurnResult["replies"] = [];
 
   // Fair-housing / compliance guardrail
@@ -359,7 +364,12 @@ async function handleShowingFlowInput(
   }
 
   if (flow.step === "email") {
-    if (extracted.email) state.email = extracted.email;
+    if (!extracted.email) {
+      replies.push({ sender: "avery", content: "Please enter a valid email address so I can complete the showing request." });
+      await persistTurn(conversationId, leadId, state, replies, lead);
+      return { replies, state };
+    }
+    state.email = extracted.email;
     return finalizeContactOrCreateShowing(conversationId, leadId, state, lead, replies);
   }
 
