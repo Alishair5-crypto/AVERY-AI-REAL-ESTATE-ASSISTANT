@@ -54,14 +54,14 @@ function normalize(text: string) {
 function extractBudget(text: string): { min?: number; max?: number } {
   const t = text.replace(/,/g, "");
   // patterns like $400k, 400k, $400,000, 2200/mo, $2,200 a month
-  const kMatch = t.match(/\$?\s?(\d{2,4})\s?k\b/i);
+  const kMatch = t.match(/$?s?(d{2,4})s?k/i);
   if (kMatch) {
     const val = parseInt(kMatch[1], 10) * 1000;
     if (/under|below|less than|max|up to/i.test(t)) return { max: val };
     if (/over|above|at least|min/i.test(t)) return { min: val };
     return { max: val };
   }
-  const dollarMatch = t.match(/\$\s?(\d{3,7})(?!\d)/);
+  const dollarMatch = t.match(/$s?(d{3,7})(?!d)/);
   if (dollarMatch) {
     const val = parseInt(dollarMatch[1], 10);
     if (val < 20000) {
@@ -73,11 +73,11 @@ function extractBudget(text: string): { min?: number; max?: number } {
     if (/over|above|at least|min/i.test(t)) return { min: val };
     return { max: val };
   }
-  const plainNumber = t.match(/budget.*?(\d{3,7})/i);
+  const plainNumber = t.match(/budget.*?(d{3,7})/i);
   if (plainNumber) {
     return { max: parseInt(plainNumber[1], 10) };
   }
-  const standaloneNumber = t.match(/^\s*(\d{3,7})\s*$/);
+  const standaloneNumber = t.match(/^s*(d{3,7})s*$/);
   if (standaloneNumber) {
     return { max: parseInt(standaloneNumber[1], 10) };
   }
@@ -85,13 +85,22 @@ function extractBudget(text: string): { min?: number; max?: number } {
 }
 
 function extractBedrooms(text: string): number | undefined {
-  const m = text.match(/(\d+)\s?(?:-|\s)?(?:bed(?:room)?s?|br\b)/i);
+  const m = text.match(/(d+)s?(?:-|s)?(?:bed(?:room)?s?|br)/i);
   if (m) return parseInt(m[1], 10);
+
+  // A standalone bedroom range/number (e.g. "4 to 5" or "4-5")
+  // is interpreted using the upper bound, matching the existing "4 to 5 bedrooms" behavior.
+  const range = text.match(/^s*(d+)s*(?:-|to)s*(d+)s*$/i);
+  if (range) return parseInt(range[2], 10);
+
+  const standalone = text.match(/^s*(d+)s*$/);
+  if (standalone) return parseInt(standalone[1], 10);
+
   return undefined;
 }
 
 function extractBathrooms(text: string): number | undefined {
-  const m = text.match(/(\d+(?:\.\d)?)\s?(?:-|\s)?(?:bath(?:room)?s?|ba\b)/i);
+  const m = text.match(/(d+(?:.d+)?)s?(?:-|s)?(?:bath(?:room)?s?|ba)/i);
   if (m) return parseFloat(m[1]);
   return undefined;
 }
@@ -108,7 +117,7 @@ function extractNeighborhood(text: string): string | undefined {
   const t = normalize(text);
   for (const n of NEIGHBORHOODS) {
     if (t.includes(n)) {
-      return n.replace(/\b\w/g, (c) => c.toUpperCase());
+      return n.replace(/w/g, (c) => c.toUpperCase());
     }
   }
   return undefined;
@@ -124,20 +133,20 @@ function extractPropertyType(text: string): string | undefined {
 
 function extractIntent(text: string): Intent | undefined {
   const t = normalize(text);
-  if (/\bsell(ing)?\b|\blist(ing)? my\b|\bwant to sell\b/.test(t)) return "Seller";
-  if (/\brent(ing)?\b|\blease\b|\btenant\b|\bapartment\b/.test(t) && !/\bbuy\b/.test(t)) return "Renter";
-  if (/\bbuy(ing)?\b|\bpurchase\b|\blooking for a house\b|\bhome\b/.test(t)) return "Buyer";
+  if (/sell(ing)?|list(ing)? my|want to sell/.test(t)) return "Seller";
+  if (/rent(ing)?|lease|tenant|apartment/.test(t) && !/buy/.test(t)) return "Renter";
+  if (/buy(ing)?|purchase|looking for a house|home/.test(t)) return "Buyer";
   return undefined;
 }
 
 function extractTimeline(text: string): string | undefined {
   const t = normalize(text);
-  if (/\basap\b|\bimmediately\b|\bright away\b/.test(t)) return "ASAP";
-  if (/\bthis (week|month)\b/.test(t)) return "Within a month";
-  if (/\d+\s?(-|to)?\s?\d*\s?months?\b/.test(t)) return t.match(/\d+\s?(-|to)?\s?\d*\s?months?/)?.[0];
-  if (/\bnext year\b/.test(t)) return "Next year";
-  if (/\bno rush\b|\bjust browsing\b|\bjust looking\b/.test(t)) return "No rush / browsing";
-  if (/\b(few|couple) of months\b/.test(t)) return "A few months";
+  if (/asap|immediately|right away/.test(t)) return "ASAP";
+  if (/this (week|month)/.test(t)) return "Within a month";
+  if (/d+s?(-|to)?s?d*s?months?/.test(t)) return t.match(/d+s?(-|to)?s?d*s?months?/)?.[0];
+  if (/next year/.test(t)) return "Next year";
+  if (/no rush|just browsing|just looking/.test(t)) return "No rush / browsing";
+  if (/(few|couple) of months/.test(t)) return "A few months";
   return undefined;
 }
 
@@ -152,36 +161,36 @@ function extractFinancing(text: string): string | undefined {
 function extractPets(text: string): string | undefined {
   const t = normalize(text);
   if (/no pets/.test(t)) return "No pets";
-  if (/\bdog\b|\bcat\b|\bpets?\b/.test(t)) return "Has pets";
+  if (/dog|cat|pets?/.test(t)) return "Has pets";
   return undefined;
 }
 
 function extractMoveInDate(text: string): string | undefined {
   const t = normalize(text);
-  const m = t.match(/move[- ]?in\s?(?:date)?\s?(?:is|:)?\s?([a-z0-9,\/\- ]{3,20})/);
+  const m = t.match(/move[- ]?ins?(?:date)?s?(?:is|:)?s?([a-z0-9,/- ]{3,20})/);
   if (m) return m[1].trim();
   return undefined;
 }
 
 function extractPhone(text: string): string | undefined {
-  const m = text.match(/(\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/);
+  const m = text.match(/(+?1[-.\s]?)?(?d{3})?[-.\s]?d{3}[-.\s]?d{4}/);
   return m ? m[0].trim() : undefined;
 }
 
 function extractEmail(text: string): string | undefined {
-  const m = text.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+  const m = text.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,}/);
   return m ? m[0].trim() : undefined;
 }
 
 function extractSellerAddress(text: string): string | undefined {
-  const m = text.match(/\d{2,6}\s+[a-zA-Z0-9.\s]{3,40}(?:st|street|ave|avenue|blvd|boulevard|dr|drive|rd|road|ln|lane|way|ct|court|pl|place)\b/i);
+  const m = text.match(/d{2,6}s+[a-zA-Z0-9.s]{3,40}(?:st|street|ave|avenue|blvd|boulevard|dr|drive|rd|road|ln|lane|way|ct|court|pl|place)/i);
   return m ? m[0].trim() : undefined;
 }
 
 function detectHumanRequest(text: string): boolean {
   const t = normalize(text);
-  return /\b(speak|talk) (to|with) (a |an )?(agent|person|human|someone|realtor)\b/.test(t) ||
-    /\bconnect me\b|\breal person\b|\bhuman agent\b/.test(t);
+  return /(speak|talk) (to|with) (a |an )?(agent|person|human|someone|realtor)/.test(t) ||
+    /connect me|real person|human agent/.test(t);
 }
 
 /**
@@ -244,7 +253,7 @@ export function looksLikeName(text: string): string | undefined {
   const trimmed = text.trim();
   if (!trimmed || trimmed.length > 40) return undefined;
   if (/[0-9@]/.test(trimmed)) return undefined;
-  const words = trimmed.split(/\s+/).filter(Boolean);
+  const words = trimmed.split(/s+/).filter(Boolean);
   if (words.length < 1 || words.length > 4) return undefined;
   if (!/^[a-zA-Z'\-.\s]+$/.test(trimmed)) return undefined;
   return words.map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
