@@ -25,6 +25,7 @@ export async function searchProperties(criteria: PropertySearchCriteria) {
   const rows = await db.select().from(properties).where(
     and(
       eq(properties.availability, "Active"),
+      ...(criteria.city ? [eq(properties.city, criteria.city)] : []),
       ...(criteria.propertyType ? [eq(properties.propertyType, criteria.propertyType)] : []),
       ...(criteria.listingType ? [eq(properties.listingType, criteria.listingType)] : []),
     ),
