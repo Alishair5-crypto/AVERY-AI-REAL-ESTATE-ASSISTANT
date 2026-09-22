@@ -22,7 +22,13 @@ export interface PropertySearchCriteria {
 }
 
 export async function searchProperties(criteria: PropertySearchCriteria) {
-  const rows = await db.select().from(properties).where(eq(properties.availability, "Active"));
+  const rows = await db.select().from(properties).where(
+    and(
+      eq(properties.availability, "Active"),
+      ...(criteria.propertyType ? [eq(properties.propertyType, criteria.propertyType)] : []),
+      ...(criteria.listingType ? [eq(properties.listingType, criteria.listingType)] : []),
+    ),
+  );
 
   const scored = rows.map((p) => {
     let score = 0;
