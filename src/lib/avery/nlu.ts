@@ -77,6 +77,10 @@ function extractBudget(text: string): { min?: number; max?: number } {
   if (plainNumber) {
     return { max: parseInt(plainNumber[1], 10) };
   }
+  const standaloneNumber = t.match(/^\s*(\d{3,7})\s*$/);
+  if (standaloneNumber) {
+    return { max: parseInt(standaloneNumber[1], 10) };
+  }
   return {};
 }
 
